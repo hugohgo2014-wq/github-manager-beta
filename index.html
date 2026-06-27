@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nexus OS - Ultra DevOps Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/search/search.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/search/searchcursor.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/yaml/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/markdown/markdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <style>
+        .CodeMirror { height: calc(100vh - 120px) !important; font-family: monospace; font-size: 13px; }
+        body { background-color: #07070c; color: #e2e8f0; -webkit-user-select: none; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #10b981; border-radius: 10px; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden">
+
+    <header class="bg-[#0f0f1a] h-12 border-b border-zinc-800 flex items-center justify-between px-3 shrink-0">
+        <div class="flex items-center gap-2 overflow-hidden w-1/2">
+            <button onclick="voltarDiretorioNavegacao()" class="text-emerald-400 active:scale-95 text-lg p-1"><i class="fas fa-arrow-left"></i></button>
+            <span id="path-string" class="text-xs font-mono text-emerald-400 truncate">/storage/github/root</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <button onclick="criarNovoRepositorioGithub()" class="bg-emerald-950 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded border border-emerald-800"><i class="fas fa-plus"></i> Repo</button>
+            <button onclick="document.getElementById('file-multi-upload').click()" class="text-zinc-400 p-1"><i class="fas fa-upload"></i></button>
+            <button onclick="abrirModalCriacao()" class="text-emerald-500 p-1"><i class="fas fa-file-plus"></i>+ Item</button>
+            <button onclick="mudarAba('tab-conta')" class="text-zinc-400 p-1"><i class="fas fa-cog"></i></button>
+        </div>
+        <input type="file" id="file-multi-upload" multiple class="hidden" onchange="uploadMultiplosArquivos(this)">
+    </header>
+
+    <main class="flex-1 overflow-hidden relative">
+
+        <div id="tab-explorer" class="view-panel h-full overflow-y-auto">
+            <div id="git-tools-bar" class="bg-[#121222] px-3 py-1.5 border-b border-zinc-800 flex items-center justify-between text-xs hidden">
+                <div class="flex items-center gap-1.5">
+                    <i class="fas fa-code-branch text-zinc-400"></i>
+                    <select id="branch-select" class="bg-black text-emerald-400 border border-zinc-800 rounded px-1 py-0.5" onchange="trocarDeBranch(this.value)"></select>
+                    <button onclick="criarNovaBranch()" class="text-zinc-300 bg-zinc-800 px-1 rounded text-[11px]">+ Criar</button>
+                    <button onclick="excluirBranchAtual()" class="text-red-400 bg-red-950/40 px-1 rounded text-[11px]"><i class="fas fa-trash"></i></button>
+                </div>
+                <button onclick="exibirHistoricoCommits()" class="text-zinc-400 text-[11px]"><i class="fas fa-history"></i> Histórico</button>
+            </div>
+            <div id="explorer-container" class="divide-y divide-zinc-900"></div>
+        </div>
+
+        <div id="tab-conta" class="view-panel h-full overflow-y-auto p-4 hidden">
+            <h2 class="text-xs font-bold text-emerald-400 mb-2"><i class="fas fa-shield-halved"></i> Configuração de Credenciais</h2>
+            <div class="flex flex-col gap-2 mb-4">
+                <input type="password" id="input-token-gh" placeholder="GitHub Personal Access Token (PAT)" class="bg-[#11111f] border border-zinc-800 p-2 rounded text-xs outline-none">
+                <input type="password" id="input-token-op" placeholder="OpenRouter AI API Key (Copilot)" class="bg-[#11111f] border border-zinc-800 p-2 rounded text-xs outline-none">
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="salvarConfigTokens()" class="bg-emerald-600 text-black font-bold text-xs p-2 rounded">Salvar</button>
+                    <button onclick="testarTokenValido()" class="bg-zinc-800 text-xs p-2 rounded">Validar</button>
+                    <button onclick="removerTokensGerais()" class="bg-red-950 text-red-400 text-xs p-2 rounded">Limpar</button>
+                </div>
+            </div>
+
+            <div id="perfil-card" class="bg-[#11111f] border border-zinc-800 p-3 rounded hidden flex flex-col gap-2">
+                <div class="flex items-center gap-3">
+                    <img id="user-avatar" class="w-10 h-10 rounded-full border border-emerald-500" src="">
+                    <div>
+                        <h3 id="user-name" class="text-xs font-bold text-white">-</h3>
+                        <p id="user-login" class="text-[11px] text-zinc-500">-</p>
+                    </div>
+                </div>
+                <div class="text-[11px]">
+                    <span class="text-zinc-400 font-bold">Permissões Identificadas (Scopes):</span>
+                    <div id="user-scopes" class="text-emerald-400 font-mono mt-1 break-words bg-black p-1.5 rounded">none</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-git-hub" class="view-panel h-full overflow-y-auto p-3 hidden">
+            <div class="grid grid-cols-4 gap-1 border-b border-zinc-800 pb-2 mb-3 text-[11px]">
+                <button onclick="alternarSubAbasGit('sub-gists'); carregarGistsDoUsuario();" class="bg-zinc-800 py-1 rounded text-center font-bold">Gists</button>
+                <button onclick="alternarSubAbasGit('sub-issues'); carregarIssuesRepo();" class="bg-zinc-800 py-1 rounded text-center font-bold">Issues</button>
+                <button onclick="alternarSubAbasGit('sub-prs'); carregarPullRequestsRepo();" class="bg-zinc-800 py-1 rounded text-center font-bold">PRs</button>
+                <button onclick="alternarSubAbasGit('sub-actions'); carregarWorkflowsActions();" class="bg-zinc-800 py-1 rounded text-center font-bold">Actions</button>
+            </div>
+            
+            <div id="sub-gists" class="sub-git flex flex-col gap-2">
+                <button onclick="criarNovoGistDialog()" class="bg-emerald-600 text-black font-bold text-xs p-1.5 rounded">+ Criar Novo Gist</button>
+                <div id="gists-wrapper" class="divide-y divide-zinc-900"></div>
+            </div>
+            <div id="sub-issues" class="sub-git hidden flex flex-col gap-2">
+                <button onclick="criarNovaIssueDialog()" class="bg-zinc-800 text-xs p-1.5 rounded text-emerald-400">+ Nova Issue</button>
+                <div id="issues-wrapper" class="divide-y divide-zinc-900"></div>
+            </div>
+            <div id="sub-prs" class="sub-git hidden flex flex-col gap-2">
+                <button onclick="criarNovoPullRequestDialog()" class="bg-zinc-800 text-xs p-1.5 rounded text-emerald-400">+ Novo Pull Request</button>
+                <div id="prs-wrapper" class="divide-y divide-zinc-900"></div>
+            </div>
+            <div id="sub-actions" class="sub-git hidden flex flex-col gap-2">
+                <div id="actions-wrapper" class="divide-y divide-zinc-900"></div>
+            </div>
+        </div>
+
+        <div id="tab-search" class="view-panel h-full overflow-y-auto p-3 hidden">
+            <div class="flex gap-1 mb-3">
+                <input type="text" id="input-busca-global" placeholder="Termo de pesquisa..." class="flex-1 bg-black text-xs p-2 border border-zinc-800 rounded outline-none">
+                <select id="select-tipo-busca" class="bg-[#11111f] text-xs p-2 border border-zinc-800 rounded">
+                    <option value="repositories">Repositórios</option>
+                    <option value="code">Arquivos</option>
+                    <option value="commits">Commits</option>
+                    <option value="users">Usuários</option>
+                    <option value="issues">Issues</option>
+                </select>
+                <button onclick="executarBuscaGlobalReal()" class="bg-emerald-600 text-black px-3 text-xs rounded"><i class="fas fa-search"></i></button>
+            </div>
+            <div id="busca-resultados" class="divide-y divide-zinc-900"></div>
+        </div>
+
+        <div id="view-editor" class="absolute inset-0 bg-black z-40 hidden flex flex-col">
+            <div class="bg-[#0f0f1a] h-12 border-b border-zinc-800 flex items-center justify-between px-3 text-xs">
+                <button onclick="fecharJanelaEditor()" class="text-zinc-400"><i class="fas fa-times"></i></button>
+                <span id="editor-current-filename" class="font-mono text-zinc-300 truncate max-w-[50%]">arquivo.txt</span>
+                <button onclick="abrirPainelCommit()" class="bg-emerald-600 text-black px-3 py-1 rounded font-bold">Commit</button>
+            </div>
+            <div class="bg-[#121222] px-3 py-1 border-b border-zinc-800 flex gap-2 items-center text-xs">
+                <input type="text" id="editor-search-input" placeholder="Buscar..." class="bg-black px-2 py-0.5 rounded border border-zinc-800 text-white w-24 text-[11px]">
+                <input type="text" id="editor-replace-input" placeholder="Substituir..." class="bg-black px-2 py-0.5 rounded border border-zinc-800 text-white w-24 text-[11px]">
+                <button onclick="executarProcuraEditor()" class="text-emerald-400"><i class="fas fa-search"></i></button>
+                <button onclick="executarSubstituicaoEditor()" class="text-red-400"><i class="fas fa-exchange-alt"></i></button>
+            </div>
+            <div class="flex-1 w-full overflow-hidden">
+                <textarea id="editor-textarea-mirror"></textarea>
+            </div>
+        </div>
+
+        <div id="view-visualizador" class="absolute inset-0 bg-[#07070c] z-30 hidden flex flex-col p-3">
+            <div class="flex justify-between items-center border-b border-zinc-800 pb-2 mb-2">
+                <h3 id="visualizador-titulo" class="text-xs font-mono text-emerald-400 truncate w-3/4">Viewer</h3>
+                <button onclick="fecharVisualizadores()" class="text-zinc-400 text-xs"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="visualizador-content" class="flex-1 overflow-auto text-xs"></div>
+        </div>
+
+    </main>
+
+    <div id="ai-cube-widget" onclick="togglePainelCopilot()" class="fixed bottom-16 right-4 w-11 h-11 bg-gradient-to-tr from-emerald-500 to-teal-700 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg z-50">🧊</div>
+    <div id="ai-copilot-window" class="fixed bottom-32 right-4 left-4 max-w-sm h-96 bg-[#0a0a12] border border-zinc-800 rounded-xl shadow-2xl z-50 hidden flex flex-col overflow-hidden">
+        <div class="bg-[#11111f] p-2 border-b border-zinc-800 flex justify-between items-center text-xs">
+            <span class="text-emerald-400 font-bold"><i class="fas fa-robot"></i> Nexus AI Copilot</span>
+            <button onclick="togglePainelCopilot()" class="text-zinc-500"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="copilot-messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2 text-xs">
+            <div class="bg-zinc-900/60 p-2 rounded text-zinc-400">Pronto para inspecionar códigos ou gerar scripts. Mande a ordem!</div>
+        </div>
+        <div class="p-2 border-t border-zinc-800 bg-[#0f0f1a] flex gap-1">
+            <textarea id="copilot-input-text" placeholder="Prompt ou código..." class="flex-1 bg-black border border-zinc-800 text-xs p-1 h-9 rounded resize-none outline-none text-white"></textarea>
+            <button onclick="enviarMensagemCopilotReal()" class="bg-emerald-600 text-black font-bold px-3 rounded text-xs">Pedir</button>
+        </div>
+    </div>
+
+    <nav class="bg-[#0f0f1a] h-14 border-t border-zinc-800 flex shrink-0">
+        <button onclick="mudarAba('tab-explorer')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-emerald-500"><i class="fas fa-folder"></i><span class="text-[10px]">Arquivos</span></button>
+        <button onclick="mudarAba('tab-git-hub')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-zinc-500"><i class="fas fa-code-merge"></i><span class="text-[10px]">Git & Hub</span></button>
+        <button onclick="mudarAba('tab-search')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-zinc-500"><i class="fas fa-search"></i><span class="text-[10px]">Busca</span></button>
+        <button onclick="exibirPainelRecursosExtras()" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-zinc-500"><i class="fas fa-layer-group"></i><span class="text-[10px]">Recursos</span></button>
+    </nav>
+
+    <script>
+        let historyNavigation = []; 
+        let currentOwner = "";
+        let currentRepo = "";
+        let currentBranch = "main";
+        let currentFileSha = "";
+        let currentFilePath = "";
+        let codeMirrorInstance = null;
+        let listaFavoritos = JSON.parse(localStorage.getItem('nexus_favs') || '[]');
+        let listaHistorico = JSON.parse(localStorage.getItem('nexus_hist') || '[]');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            inicializarCodeMirror();
+            carregarTokensLocais();
+            mudarAba('tab-explorer');
+            if(obterTokenGitHub()) {
+                conectarEListarRaizExplorer();
+                testarTokenValido();
+            }
+        });
+
+        function inicializarCodeMirror() {
+            codeMirrorInstance = CodeMirror.fromTextArea(document.getElementById('editor-textarea-mirror'), {
+                lineNumbers: true, theme: 'dracula', mode: 'javascript', tabSize: 4, lineWrapping: true
+            });
+        }
+
+        // CORREÇÃO DO BOTÃO VOLTAR CONTEXTUAL PARA INTERFACE DE TOKENS E SUB-TELAS
+        function voltarDiretorioNavegacao() {
+            let activeTab = 'tab-explorer';
+            document.querySelectorAll('.view-panel').forEach(p => { if(!p.classList.contains('hidden')) activeTab = p.id; });
+
+            if (activeTab !== 'tab-explorer') {
+                mudarAba('tab-explorer');
+                return;
+            }
+            if(historyNavigation.length > 1) { 
+                historyNavigation.pop(); 
+                listarArquivosDiretorioReal(); 
+            } else if (currentRepo !== "") { 
+                conectarEListarRaizExplorer(); 
+            } else {
+                alert("Você já está na raiz dos Repositórios.");
+            }
+        }
+
+        function mudarAba(idTarget) {
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden'));
+            document.getElementById(idTarget).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.replace('text-emerald-500', 'text-zinc-500'));
+            const idx = ['tab-explorer', 'tab-git-hub', 'tab-search'].indexOf(idTarget);
+            if(idx !== -1) document.querySelectorAll('.nav-btn')[idx]?.classList.replace('text-zinc-500', 'text-emerald-500');
+        }
+
+        function alternarSubAbasGit(subId) {
+            document.querySelectorAll('.sub-git').forEach(sb => sb.classList.add('hidden'));
+            document.getElementById(subId).classList.remove('hidden');
+        }
+
+        function togglePainelCopilot() { document.getElementById('ai-copilot-window').classList.toggle('hidden'); }
+        function carregarTokensLocais() {
+            document.getElementById('input-token-gh').value = localStorage.getItem('nexus_tk_gh') || '';
+            document.getElementById('input-token-op').value = localStorage.getItem('nexus_tk_op') || '';
+        }
+        function salvarConfigTokens() {
+            localStorage.setItem('nexus_tk_gh', document.getElementById('input-token-gh').value.trim());
+            localStorage.setItem('nexus_tk_op', document.getElementById('input-token-op').value.trim());
+            alert("Tokens Gravados!"); conectarEListarRaizExplorer(); testarTokenValido();
+        }
+        function removerTokensGerais() { localStorage.removeItem('nexus_tk_gh'); localStorage.removeItem('nexus_tk_op'); location.reload(); }
+        const obterTokenGitHub = () => localStorage.getItem('nexus_tk_gh') || '';
+        const obterTokenOpenRouter = () => localStorage.getItem('nexus_tk_op') || '';
+        const headersGH = () => ({ "Authorization": `token ${obterTokenGitHub()}`, "Accept": "application/vnd.github.v3+json", "Content-Type": "application/json" });
+
+        async function testarTokenValido() {
+            if(!obterTokenGitHub()) return;
+            try {
+                const res = await fetch('https://api.github.com/user', { headers: headersGH() });
+                if(res.ok) {
+                    const d = await res.json();
+                    document.getElementById('perfil-card').classList.remove('hidden');
+                    document.getElementById('user-avatar').src = d.avatar_url;
+                    document.getElementById('user-name').innerText = d.name || d.login;
+                    document.getElementById('user-login').innerText = `@${d.login}`;
+                    document.getElementById('user-scopes').innerText = res.headers.get('X-OAuth-Scopes') || 'none';
+                }
+            } catch(e){}
+        }
+
+        // NOVO: DELETAR REPOSITÓRIO COMPLETO
+        async function deletarRepositorioCompletoGithub(owner, repo) {
+            if(!confirm(`⚠️ PERIGO MÁXIMO:\nDeseja REALMENTE deletar o repositório "${repo}" para sempre? Esta ação não pode ser desfeita.`)) return;
+            try {
+                const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { method: 'DELETE', headers: headersGH() });
+                if(res.ok) {
+                    alert("Repositório apagado da nuvem!");
+                    conectarEListarRaizExplorer();
+                } else {
+                    alert("Erro ao deletar. O Token inserido precisa da permissão 'delete_repo'.");
+                }
+            } catch(e) { alert("Falha na requisição."); }
+        }
+
+        async function criarNovoRepositorioGithub() {
+            const n = prompt("Nome do novo Repositório:"); if(!n) return;
+            const d = prompt("Descrição:", "Criado via Nexus OS");
+            const p = confirm("Privado? (OK para Privado, Cancelar para Público)");
+            try {
+                const res = await fetch('https://api.github.com/user/repos', {
+                    method: 'POST', headers: headersGH(), body: JSON.stringify({ name: n, description: d, private: p, auto_init: true })
+                });
+                if(res.ok) { alert("Repositório Criado!"); conectarEListarRaizExplorer(); }
+            } catch(e){}
+        }
+
+        async function conectarEListarRaizExplorer() {
+            if(!obterTokenGitHub()) return;
+            currentOwner = ""; currentRepo = ""; historyNavigation = [];
+            document.getElementById('path-string').innerText = "/storage/github/root";
+            document.getElementById('git-tools-bar').classList.add('hidden');
+            const c = document.getElementById('explorer-container');
+            c.innerHTML = `<div class="text-zinc-500 text-xs p-4 text-center">Acessando Repositórios...</div>`;
+            try {
+                const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', { headers: headersGH() });
+                const repos = await res.json(); c.innerHTML = "";
+                if(Array.isArray(repos)) {
+                    repos.forEach(r => {
+                        c.innerHTML += `
+                            <div class="flex items-center justify-between p-3 active:bg-zinc-900">
+                                <div class="flex items-center gap-3 overflow-hidden flex-1" onclick="entrarNoRepositorio('${r.owner.login}', '${r.name}', '${r.default_branch}')">
+                                    <span class="text-emerald-500 text-base"><i class="fas ${r.fork ? 'fa-code-fork' : (r.private ? 'fa-lock' : 'fa-folder-open')}"></i></span>
+                                    <div class="truncate">
+                                        <div class="text-xs font-bold text-zinc-200 truncate">${r.name}</div>
+                                        <div class="text-[10px] text-zinc-500 truncate">${r.description || 'Sem descrição'} | Updated: ${new Date(r.updated_at).toLocaleDateString()}</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 shrink-0 pl-2">
+                                    <button onclick="alternarFavorito('${r.owner.login}/${r.name}')" class="text-zinc-500 text-xs p-1"><i class="fas fa-star ${listaFavoritos.includes(r.owner.login+'/'+r.name)?'text-amber-400':''}"></i></button>
+                                    <button onclick="deletarRepositorioCompletoGithub('${r.owner.login}', '${r.name}')" class="text-red-500 text-xs p-1 active:scale-90"><i class="fas fa-trash-alt"></i></button>
+                                </div>
+                            </div>`;
+                    });
+                }
+            } catch(e) { c.innerHTML = `<div class="text-red-500 text-xs p-4 text-center">Falha ao listar.</div>`; }
+        }
+
+        async function entrarNoRepositorio(owner, repo, defBranch) {
+            currentOwner = owner; currentRepo = repo; currentBranch = defBranch; historyNavigation = [""];
+            registrarHistorico(`${owner}/${repo}`);
+            document.getElementById('git-tools-bar').classList.remove('hidden');
+            await carregarBranchesDoRepo(); await listarArquivosDiretorioReal();
+        }
+
+        async function listarArquivosDiretorioReal() {
+            const innerPath = historyNavigation.join("/");
+            const pathLimpo = innerPath === "" ? "" : "/" + historyNavigation.slice(1).join("/");
+            document.getElementById('path-string').innerText = `${currentRepo}${pathLimpo}`;
+            const c = document.getElementById('explorer-container');
+            c.innerHTML = `<div class="text-zinc-500 text-xs p-4 text-center">Escaneando Diretório...</div>`;
+            try {
+                const queryPath = historyNavigation.slice(1).join("/");
+                const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${queryPath}?ref=${currentBranch}`, { headers: headersGH() });
+                const itens = await res.json(); c.innerHTML = "";
+                if(Array.isArray(itens)) {
+                    itens.sort((a,b) => b.type.localeCompare(a.type));
+                    itens.forEach(item => {
+                        const esPasta = item.type === 'dir';
+                        c.innerHTML += `
+                            <div class="flex items-center justify-between p-2.5 active:bg-zinc-900">
+                                <div class="flex items-center gap-3 overflow-hidden flex-1" onclick="${esPasta ? `avancarDiretorio('${item.name}')` : `abrirArquivoFiltroViewer('${item.path}', '${item.sha}')`}">
+                                    <span class="text-base ${esPasta ? 'text-amber-500' : 'text-zinc-400'}"><i class="fas ${esPasta ? 'fa-folder' : 'fa-file-code'}"></i></span>
+                                    <div class="truncate">
+                                        <div class="text-xs text-zinc-200 truncate">${item.name}</div>
+                                        <div class="text-[10px] text-zinc-500 font-mono">${esPasta ? 'Pasta' : (item.size/1024).toFixed(1) + ' KB'}</div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2.5 text-xs text-zinc-500 shrink-0">
+                                    <button onclick="renomearMoverItemPrompt('${item.path}')" class="p-1"><i class="fas fa-edit"></i></button>
+                                    <button onclick="deletarItemGitHub('${item.path}', '${item.sha}')" class="text-red-500 p-1"><i class="fas fa-minus-circle"></i></button>
+                                </div>
+                            </div>`;
+                    });
+                }
+            } catch(e) { c.innerHTML = `<div class="text-zinc-600 text-xs p-4 text-center">Diretório Vazio.</div>`; }
+        }
+
+        function avancarDiretorio(pasta) { historyNavigation.push(pasta); listarArquivosDiretorioReal(); }
+
+        function abrirArquivoFiltroViewer(path, sha) {
+            const ext = path.split('.').pop().toLowerCase();
+            currentFilePath = path; currentFileSha = sha;
+            if(['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) { exibirImagemReal(path); } 
+            else if(ext === 'md') { exibirMarkdownReal(path); } 
+            else if(['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext)) { exibirAudioReal(path); } 
+            else { abrirTextoNoEditor(path, sha); }
+        }
+
+        async function abrirTextoNoEditor(path, sha) {
+            document.getElementById('editor-current-filename').innerText = "Aguarde...";
+            document.getElementById('view-editor').classList.remove('hidden');
+            const ext = path.split('.').pop().toLowerCase();
+            let m = 'javascript';
+            if (ext === 'py') m = 'python';
+            else if (['c', 'cpp', 'java'].includes(ext)) m = 'text/x-c++src';
+            else if (ext === 'html') m = 'text/html';
+            else if (ext === 'css') m = 'text/css';
+            else if (['json', 'xml', 'yaml', 'md'].includes(ext)) m = ext;
+            codeMirrorInstance.setOption('mode', m);
+            try {
+                const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${path}?ref=${currentBranch}`, { headers: headersGH() });
+                const d = await res.json();
+                codeMirrorInstance.setValue(decodeURIComponent(escape(window.atob(d.content))));
+                document.getElementById('editor-current-filename').innerText = path;
+            } catch(e) { codeMirrorInstance.setValue("// Erro de leitura."); }
+        }
+
+        function fecharJanelaEditor() { document.getElementById('view-editor').classList.add('hidden'); }
+        function executarProcuraEditor() { CodeMirror.commands.find(codeMirrorInstance, document.getElementById('editor-search-input').value); }
+        function executarSubstituicaoEditor() {
+            codeMirrorInstance.setValue(codeMirrorInstance.getValue().replaceAll(document.getElementById('editor-search-input').value, document.getElementById('editor-replace-input').value));
+        }
+
+        function abrirPainelCommit() {
+            const msg = prompt("Mensagem Customizada do Commit:", `Update: ${currentFilePath}`);
+            if(msg) executarCommitReal(msg);
+        }
+
+        async function executarCommitReal(msgCommit) {
+            const b64 = window.btoa(unescape(encodeURIComponent(codeMirrorInstance.getValue())));
+            try {
+                const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${currentFilePath}`, {
+                    method: "PUT", headers: headersGH(), body: JSON.stringify({ message: msgCommit, content: b64, sha: currentFileSha, branch: currentBranch })
+                });
+                if(res.ok) { alert("Commit Efetuado!"); fecharJanelaEditor(); listarArquivosDiretorioReal(); }
+            } catch(e){}
+        }
+
+        function abrirModalCriacao() {
+            if(!currentRepo) return alert("Abra um repositório primeiro!");
+            const tipo = prompt("Digite 'arquivo' ou 'pasta':"); if(!tipo) return;
+            const nome = prompt("Nome do item:"); if(!nome) return;
+            let pathFinal = historyNavigation.slice(1).join("/");
+            pathFinal = pathFinal === "" ? nome : pathFinal + "/" + nome;
+            if(tipo.trim() === 'pasta') pathFinal += "/.gitkeep";
+            fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${pathFinal}`, {
+                method: "PUT", headers: headersGH(), body: JSON.stringify({ message: `Criar ${nome}`, content: "Ym9tYmE=", branch: currentBranch })
+            }).then(() => listarArquivosDiretorioReal());
+        }
+
+        async function deletarItemGitHub(path, sha) {
+            if(!confirm("Deletar este arquivo da nuvem?")) return;
+            try {
+                await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${path}`, {
+                    method: "DELETE", headers: headersGH(), body: JSON.stringify({ message: `Deletar ${path}`, sha: sha, branch: currentBranch })
+                });
+                listarArquivosDiretorioReal();
+            } catch(e){}
+        }
+
+        async function renomearMoverItemPrompt(oldPath) {
+            const newPath = prompt("Novo caminho/nome do arquivo:", oldPath); if(!newPath || newPath === oldPath) return;
+            const rg = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${oldPath}?ref=${currentBranch}`, { headers: headersGH() });
+            const dg = await rg.json();
+            await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${newPath}`, {
+                method: "PUT", headers: headersGH(), body: JSON.stringify({ message: `Mover ${oldPath}`, content: dg.content, branch: currentBranch })
+            });
+            await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${oldPath}`, {
+                method: "DELETE", headers: headersGH(), body: JSON.stringify({ message: `Limpar ${oldPath}`, sha: dg.sha, branch: currentBranch })
+            });
+            listarArquivosDiretorioReal();
+        }
+
+        function uploadMultiplosArquivos(input) {
+            const arquivos = Array.from(input.files); if(arquivos.length === 0) return;
+            arquivos.forEach(file => {
+                const r = new FileReader();
+                r.onload = async function(e) {
+                    let binary = ''; const bytes = new Uint8Array(e.target.result);
+                    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                    let pathFinal = historyNavigation.slice(1).join("/");
+                    pathFinal = pathFinal === "" ? file.name : pathFinal + "/" + file.name;
+                    await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${pathFinal}`, {
+                        method: "PUT", headers: headersGH(), body: JSON.stringify({ message: `Upload: ${file.name}`, content: window.btoa(binary), branch: currentBranch })
+                    });
+                    listarArquivosDiretorioReal();
+                };
+                r.readAsArrayBuffer(file);
+            });
+        }
+
+        async function carregarBranchesDoRepo() {
+            try {
+                const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/branches`, { headers: headersGH() });
+                const b = await res.json(); const sel = document.getElementById('branch-select'); sel.innerHTML = "";
+                b.forEach(branch => { sel.innerHTML += `<option value="${branch.name}" ${branch.name === currentBranch ? 'selected':''}>${branch.name}</option>`; });
+            } catch(e){}
+        }
+        function trocarDeBranch(nb) { currentBranch = nb; listarArquivosDiretorioReal(); }
+        async function criarNovaBranch() {
+            const n = prompt("Nome da nova Branch:"); if(!n) return;
+            const rb = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/git/ref/heads/${currentBranch}`, { headers: headersGH() });
+            const db = await rb.json();
+            await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/git/refs`, {
+                method: "POST", headers: headersGH(), body: JSON.stringify({ ref: `refs/heads/${n}`, sha: db.object.sha })
+            });
+            await carregarBranchesDoRepo(); trocarDeBranch(n);
+        }
+
+        // NOVO: DELETAR BRANCH ATUAL
+        async function excluirBranchAtual() {
+            if(['main', 'master'].includes(currentBranch)) return alert("Operação abortada: Não delete a branch principal.");
+            if(!confirm(`Apagar a branch "${currentBranch}" definitivamente?`)) return;
+            const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/git/refs/heads/${currentBranch}`, { method: 'DELETE', headers: headersGH() });
+            if(res.ok) { alert("Branch Removida!"); currentBranch = "main"; await carregarBranchesDoRepo(); listarArquivosDiretorioReal(); }
+        }
+
+        // CONTROLADORES DE MULTIVIEWERS MULTIMÍDIA
+        function fecharVisualizadores() { document.getElementById('view-visualizador').classList.add('hidden'); }
+        function exibirImagemReal(path) {
+            document.getElementById('visualizador-titulo').innerText = path;
+            document.getElementById('visualizador-content').innerHTML = `<div class="text-center p-2"><img src="https://raw.githubusercontent.com/${currentOwner}/${currentRepo}/${currentBranch}/${path}" class="max-w-full rounded border border-zinc-800 inline-block"/></div>`;
+            document.getElementById('view-visualizador').classList.remove('hidden');
+        }
+        async function exibirMarkdownReal(path) {
+            document.getElementById('visualizador-titulo').innerText = path; document.getElementById('view-visualizador').classList.remove('hidden');
+            const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${path}?ref=${currentBranch}`, { headers: headersGH() });
+            const d = await res.json();
+            document.getElementById('visualizador-content').innerHTML = `<div class="p-2 text-zinc-300">${marked.parse(decodeURIComponent(escape(window.atob(d.content))))}</div>`;
+        }
+        function exibirAudioReal(path) {
+            document.getElementById('visualizador-titulo').innerText = `Som: ${path}`;
+            document.getElementById('visualizador-content').innerHTML = `
+                <div class="p-8 bg-[#10101f] rounded text-center flex flex-col items-center gap-3 border border-zinc-800">
+                    <i class="fas fa-waveform text-3xl text-emerald-400"></i>
+                    <audio controls src="https://raw.githubusercontent.com/${currentOwner}/${currentRepo}/${currentBranch}/${path}" class="w-full mt-2"></audio>
+                </div>`;
+            document.getElementById('view-visualizador').classList.remove('hidden');
+        }
+
+        // INFRAESTRUTURA COMPLETA: GISTS, ISSUES, PRS E ACTIONS WORKFLOWS
+        async function carregarGistsDoUsuario() {
+            const w = document.getElementById('gists-wrapper'); w.innerHTML = "Lendo Gists...";
+            const res = await fetch('https://api.github.com/gists', { headers: headersGH() }); const gists = await res.json(); w.innerHTML = "";
+            if(Array.isArray(gists)) {
+                gists.forEach(g => {
+                    w.innerHTML += `
+                        <div class="p-2 text-xs flex justify-between items-center">
+                            <div class="truncate w-3/4"><span class="text-emerald-400 font-bold">${g.public ? '[PÚBLICO]':'[PRIVADO]'}</span> ${Object.keys(g.files)[0]}</div>
+                            <button onclick="deletarGistReal('${g.id}')" class="text-red-500 text-[11px] px-1"><i class="fas fa-trash-alt"></i></button>
+                        </div>`;
+                });
+            }
+        }
+        async function criarNovoGistDialog() {
+            const nomeF = prompt("Nome do arquivo do Gist:"); if(!nomeF) return;
+            const corpo = prompt("Conteúdo do arquivo:");
+            const pub = confirm("Gist Público? (OK para Sim)");
+            await fetch('https://api.github.com/gists', {
+                method: 'POST', headers: headersGH(), body: JSON.stringify({ public: pub, files: { [nomeF]: { content: corpo || "Vazio" } } })
+            }); carregarGistsDoUsuario();
+        }
+        async function deletarGistReal(id) { if(confirm("Apagar este Gist?")) { await fetch(`https://api.github.com/gists/${id}`, { method: 'DELETE', headers: headersGH() }); carregarGistsDoUsuario(); } }
+
+        async function carregarIssuesRepo() {
+            const w = document.getElementById('issues-wrapper'); w.innerHTML = "Buscando Issues..."; if(!currentRepo) return w.innerHTML = "Selecione um Repo.";
+            const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/issues?state=all`, { headers: headersGH() }); const issues = await res.json(); w.innerHTML = "";
+            if(Array.isArray(issues)) {
+                issues.forEach(i => {
+                    if(i.pull_request) return;
+                    w.innerHTML += `
+                        <div class="p-2 text-xs flex justify-between items-center">
+                            <div><span class="font-bold ${i.state === 'open'?'text-emerald-400':'text-zinc-500'}">[#${i.number}]</span> ${i.title}</div>
+                            ${i.state === 'open' ? `<button onclick="fecharIssueReal(${i.number})" class="text-[10px] bg-zinc-800 px-1 rounded text-red-400">Fechar</button>`:''}
+                        </div>`;
+                });
+            }
+        }
+        async function criarNovaIssueDialog() {
+            const t = prompt("Título da Issue:"); if(!t) return;
+            const b = prompt("Comentário/Descrição:");
+            await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/issues`, { method: 'POST', headers: headersGH(), body: JSON.stringify({ title: t, body: b }) });
+            carregarIssuesRepo();
+        }
+        async function fecharIssueReal(num) { await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/issues/${num}`, { method: 'PATCH', headers: headersGH(), body: JSON.stringify({ state: 'closed' }) }); carregarIssuesRepo(); }
+
+        async function carregarPullRequestsRepo() {
+            const w = document.getElementById('prs-wrapper'); w.innerHTML = "Buscando Pull Requests..."; if(!currentRepo) return w.innerHTML = "Selecione um Repo.";
+            const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/pulls?state=all`, { headers: headersGH() }); const prs = await res.json(); w.innerHTML = "";
+            if(Array.isArray(prs)) {
+                prs.forEach(p => {
+                    w.innerHTML += `
+                        <div class="p-2 text-xs flex justify-between items-center">
+                            <div><span class="text-purple-400 font-bold">[PR #${p.number}]</span> ${p.title}</div>
+                            ${p.state === 'open' ? `<button onclick="mergePullRequestReal(${p.number})" class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1 rounded">Merge</button>`:''}
+                        </div>`;
+                });
+            }
+        }
+        async function criarNovoPullRequestDialog() {
+            const t = prompt("Título do Pull Request:"); if(!t) return;
+            const head = prompt("Branch de Origem (ex: dev):");
+            const base = prompt("Branch de Destino (ex: main):", "main");
+            await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/pulls`, { method: 'POST', headers: headersGH(), body: JSON.stringify({ title: t, head: head, base: base }) });
+            carregarPullRequestsRepo();
+        }
+        async function mergePullRequestReal(num) { if(confirm("Aprovar e commitar Merge deste PR?")) { await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/pulls/${num}/merge`, { method: 'PUT', headers: headersGH() }); carregarPullRequestsRepo(); } }
+
+        async function carregarWorkflowsActions() {
+            const w = document.getElementById('actions-wrapper'); w.innerHTML = "Buscando Workflows..."; if(!currentRepo) return w.innerHTML = "Selecione um Repo.";
+            const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/actions/workflows`, { headers: headersGH() }); const data = await res.json(); w.innerHTML = "";
+            if(data.workflows) {
+                data.workflows.forEach(wf => {
+                    w.innerHTML += `
+                        <div class="p-2 text-xs flex justify-between items-center">
+                            <div><div class="font-bold text-zinc-200">${wf.name}</div><div class="text-[10px] text-zinc-500">${wf.path}</div></div>
+                            <button onclick="dispararWorkflowWorkflowDispatch('${wf.id}')" class="bg-zinc-800 text-[11px] px-2 py-0.5 rounded text-emerald-400"><i class="fas fa-play"></i> Run</button>
+                        </div>`;
+                });
+            }
+        }
+        async function dispararWorkflowWorkflowDispatch(id) {
+            await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/actions/workflows/${id}/dispatches`, {
+                method: 'POST', headers: headersGH(), body: JSON.stringify({ ref: currentBranch })
+            }); alert("Execução do Workflow solicitada!");
+        }
+
+        // HISTÓRICO DE COMMITS NATIVO
+        async function exibirHistoricoCommits() {
+            document.getElementById('visualizador-titulo').innerText = "Histórico de Commits";
+            const content = document.getElementById('visualizador-content'); content.innerHTML = "Buscando logs...";
+            document.getElementById('view-visualizador').classList.remove('hidden');
+            const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/commits?sha=${currentBranch}`, { headers: headersGH() });
+            const commits = await res.json(); content.innerHTML = "";
+            commits.forEach(c => {
+                content.innerHTML += `<div class="p-2 border-b border-zinc-800 font-mono"><div class="text-emerald-400 font-bold">${c.commit.message}</div><div class="text-[10px] text-zinc-500">${c.commit.author.name} | ${c.sha.substring(0,7)}</div></div>`;
+            });
+        }
+
+        // MOTOR DE BUSCA GLOBAL
+        async function ejecutarBuscaGlobalReal() {
+            const q = document.getElementById('input-busca-global').value.trim(); const t = document.getElementById('select-tipo-busca').value;
+            const c = document.getElementById('busca-resultados'); c.innerHTML = "Buscando na infraestrutura global...";
+            const res = await fetch(`https://api.github.com/search/${t}?q=${q}`, { headers: headersGH() }); const data = await res.json(); c.innerHTML = "";
+            if(data.items) {
+                data.items.slice(0, 15).forEach(item => {
+                    c.innerHTML += `<div class="p-2 text-xs border-b border-zinc-900 font-bold text-emerald-400">${item.full_name || item.title || item.login || item.sha}</div>`;
+                });
+            }
+        }
+
+        // INTEGRACAO LOCAL EXTRA, FAVORITOS E HISTÓRICO
+        function alternarFavorito(slug) {
+            if(listaFavoritos.includes(slug)) listaFavoritos = listaFavoritos.filter(x => x !== slug);
+            else listaFavoritos.push(slug);
+            localStorage.setItem('nexus_favs', JSON.stringify(listaFavoritos)); conectarEListarRaizExplorer();
+        }
+        function registrarHistorico(slug) {
+            listaHistorico = listaHistorico.filter(x => x !== slug); listaHistorico.unshift(slug);
+            if(listaHistorico.length > 5) listaHistorico.pop();
+            localStorage.setItem('nexus_hist', JSON.stringify(listaHistorico));
+        }
+        async function baixarPastaAtualZip() {
+            const zip = new JSZip(); const q = historyNavigation.slice(1).join("/");
+            const res = await fetch(`https://api.github.com/repos/${currentOwner}/${currentRepo}/contents/${q}?ref=${currentBranch}`, { headers: headersGH() });
+            const items = await res.json();
+            for(let it of items) { if(it.type === 'file') { const f = await fetch(it.download_url); const b = await f.blob(); zip.file(it.name, b); } }
+            zip.generateAsync({type:"blob"}).then(c => {
+                const a = document.createElement("a"); a.href = URL.createObjectURL(c); a.download = `${currentRepo || 'backup'}.zip`; a.click();
+            });
+        }
+
+        function exibirPainelRecursosExtras() {
+            document.getElementById('visualizador-titulo').innerText = "Recursos Extras & Plugins"; document.getElementById('view-visualizador').classList.remove('hidden');
+            let favsHtml = listaFavoritos.map(f => `<div class="p-1 font-mono text-[11px] text-amber-400">⭐ ${f}</div>`).join("") || "Nenhum.";
+            let histHtml = listaHistorico.map(h => `<div class="p-1 font-mono text-[11px] text-zinc-400">🕒 ${h}</div>`).join("") || "Vazio.";
+            document.getElementById('visualizador-content').innerHTML = `
+                <div class="flex flex-col gap-3">
+                    <div class="bg-[#10101f] border border-zinc-800 p-2.5 rounded">
+                        <button onclick="baixarPastaAtualZip()" class="bg-emerald-600 text-black text-xs font-bold p-2 rounded w-full">🗜️ Compactar e Baixar Diretório em .ZIP</button>
+                    </div>
+                    <div class="bg-[#10101f] border border-zinc-800 p-2.5 rounded">
+                        <h4 class="font-bold text-emerald-400 text-xs mb-1">Favoritos</h4>${favsHtml}
+                    </div>
+                    <div class="bg-[#10101f] border border-zinc-800 p-2.5 rounded">
+                        <h4 class="font-bold text-emerald-400 text-xs mb-1">Histórico Recente</h4>${histHtml}
+                    </div>
+                </div>`;
+        }
+
+        // ENGINE COPILOT AI CHAT INTERFACE
+        async function enviarMensagemCopilotReal() {
+            const key = obterTokenOpenRouter(); const inp = document.getElementById('copilot-input-text'); const txt = inp.value.trim();
+            const box = document.getElementById('copilot-messages'); if(!txt) return;
+            box.innerHTML += `<div class="bg-emerald-950/50 p-2 rounded text-emerald-300 self-end max-w-[85%] font-mono">${txt}</div>`;
+            inp.value = ""; box.scrollTop = box.scrollHeight;
+            const b = document.createElement("div"); b.className = "bg-zinc-900 p-2 rounded text-zinc-300 self-start max-w-[85%] font-mono";
+            b.innerText = "Analisando..."; box.appendChild(b);
+            try {
+                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST", headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: "openrouter/free", messages: [{ role: "system", content: "Você é o Nexus Copilot. Responda apenas dúvidas e correções sobre códigos (nota seu Markdown não funciona no chat então não os use)." }, { role: "user", content: txt }] })
+                });
+                const d = await res.json(); b.innerText = d.choices[0].message.content;
+            } catch(e) { b.innerText = "Erro no OpenRouter."; }
+            box.scrollTop = box.scrollHeight;
+        }
+    </script>
+</body>
+</html>
